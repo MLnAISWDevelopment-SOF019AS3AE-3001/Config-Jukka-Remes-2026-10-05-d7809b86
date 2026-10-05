@@ -1,0 +1,51 @@
+name: Start a run from Jupyter Notebook on local server via self-hosted runner
+
+on:
+  push:
+    # development, and any feature branch created from it. This file is copied
+    # onto the development branch of each ML repo, so feature branches inherit it.
+    branches:
+      - "**"
+    paths:
+      - 'notebooks/**'
+
+jobs:
+  run-notebook-in-development-environment:
+    runs-on: self-hosted
+    env:
+      GIT_COMMIT_HASH: ${{ github.sha }}
+      GIT_BRANCH_NAME: ${{ github.ref_name }}
+      GIT_BRANCH_URL: ${{ github.server_url }}/${{ github.repository }}/tree/${{ github.ref_name }}
+    
+    steps:
+    - name: Record git provenance for the pipeline run
+      run: |
+        echo "git_commit_hash=${GIT_COMMIT_HASH}"
+        echo "git_branch_name=${GIT_BRANCH_NAME}"
+        echo "git_branch_url=${GIT_BRANCH_URL}"
+
+    - name: Checkout repository
+      uses: actions/checkout@v4 # Use the latest version of checkout action
+    
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v5 # Use the latest version of setup-python
+      with:
+        python-version: '3.8'
+        cache: 'pip' # Speeds up execution by caching dependencies
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install jupyter
+        
+    - name: Connect to local server and run the Notebook
+      run: |       
+        # Execute the Jupyter Notebook and overwrite the existing file with the results
+        jupyter nbconvert --execute --to notebook --inplace notebooks/demo-pipeline.ipynb
+        
+    - name: Upload executed Notebook as artifact # This allows you to download the executed notebook from the workflow run page
+      uses: actions/upload-artifact@v4
+      with:
+        name: executed-notebook
+        path: notebooks/demo-pipeline.ipynb
+        retention-days: 7 # Keep the artifact for 7 days (you can adjust this as needed)
